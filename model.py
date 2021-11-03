@@ -9,12 +9,21 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-class Model(nn.Module):
+class SimpleFly(nn.Module):
     def __init__(self):
-        super(Model, self).__init__()
-        self.conv1 = nn.Conv2d(1, 20, 5)
-        self.conv2 = nn.Conv2d(20, 20, 5)
+        super(SimpleFly, self).__init__()
+        self.pn_kc = nn.Linear(50, 2000)
+        self.kc_mbon = nn.Linear(2000, 34)
+        self.decoder = nn.Linear(34, 2)
+        
+        self.activation = nn.ReLU()
+        self.max = nn.Softmax(dim=-1)
 
-    def forward(self, x):
-        x = F.relu(self.conv1(x))
-        return F.relu(self.conv2(x))
+    def forward(self, odor):
+        kenyon_cells = self.max(self.pn_kc(odor))
+        mbon = self.activation(self.kc_mbon(kenyon_cells))
+        action = self.max(self.decoder(mbon))
+        return action
+    
+
+
