@@ -4,48 +4,63 @@ Created on Mon Nov  1 17:25:08 2021
 
 @author: murra
 """
-import numpy as np
 import torch
 import torch.nn as nn
-import torch.nn.functional as F
-import os
 from environment import Dataset
-from model import SimpleFly
+from model import ComplexFly
 import matplotlib.pyplot as plt
+device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
-
-def OptimizeModel(net, actions, epochs):    
+def OptimizeModel(net, batch, actions, threshold, epochs):    
     # Datasets
-    trainfunc = Dataset(actions, 10, 1)
-    trainloader = torch.utils.data.DataLoader(trainfunc, batch_size=1, shuffle=True, num_workers=0)
+    trainfunc = Dataset(actions, threshold, batch*5)
+    trainloader = torch.utils.data.DataLoader(trainfunc, batch_size=batch, shuffle=True, num_workers=0)
     
     # Optimize and Loss
     optimizer = torch.optim.Adam(net.parameters())
+    lossfunc = nn.CrossEntropyLoss()
     loss_results = []
     
     # Train
     for epoch in range(epochs):
     
         for k, data in enumerate(trainloader, 0):
-            inputs, labels = data[0], data[1]
+            inputs, contexts, labels = data[0].to(device), data[1].to(device), data[2].to(device)
             net.train()
+            net.resetWeights()
             optimizer.zero_grad()
-            reward = torch.tensor(0.0)
+            loss = torch.tensor(0.0)
             for i in range(actions):
-                X = inputs[:,i,:]
-                y = labels[:,i,:]
-                action = net(X)
-                reward -= torch.squeeze(torch.matmul(y,action.T))
-            reward.backward(retain_graph=True)
+                X = inputs[:,i,:,:]
+                c = contexts[:,i,:]
+                y = torch.squeeze(labels[:,i,:])
+                action = net(X, c)
+                loss += lossfunc(action, y)
+            loss.backward(retain_graph=True)
             optimizer.step()
-            loss_results.append(-1*reward.item())
-            
+            loss_results.append(loss.item())
             
     print('Finished Training')
     return loss_results
 
 
 if __name__ == "__main__":
-    net = SimpleFly()
-    results = OptimizeModel(net, 100, 2500)
-    plt.plot(results)
+    batch = 5
+    dt = 0.5
+    amount_of_actions = 50
+    action_threshold = 5
+    epochs = 20
+    net = ComplexFly(batch, dt, device)
+    results = OptimizeModel(net, batch, amount_of_actions, action_threshold, epochs)
+    fig, ax = plt.subplots()
+    ax.plot(results)
+    ax.set_ylabel('Cross Entropy Loss')
+    ax.set_xlabel('Training sample')
+    ax.set_title('Loss for Mushroom Body model')
+    plt.show()
+    
+    
+    
+    
+    
+    

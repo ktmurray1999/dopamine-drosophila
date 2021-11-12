@@ -6,9 +6,6 @@ Created on Mon Oct 25 20:29:51 2021
 """
 import numpy as np
 import torch
-import torch.nn as nn
-import torch.nn.functional as F
-import os
 
 context = {'hungry': 0, 'thirsty': 1, 'tired':2}
 context_lookup = {0: 'hungry', 1: 'thirsty', 2:'tired'}
@@ -17,15 +14,9 @@ actions_lookup = {0: 'consume', 1: 'rest'}
 
 context_change_p = [1/3, 1/3, 1/3]
 
-hungry_reward = [[1.0,0.0],
-                 [0.0,1.0]]
-
-thirsty_reward = [[0.0,1.0],
-                  [1.0,0.0]]
-
-tired_reward = [[0.0,1.0],
-                [0.0,1.0]]
-
+hungry_reward = [0,1]
+thirsty_reward = [1,0]
+tired_reward = [1,1]
 reward_signal = torch.tensor([hungry_reward,thirsty_reward,tired_reward])
 
 context_signal = torch.tensor([[1,0,0],
@@ -44,8 +35,8 @@ class Environment():
         self.context_odor_action_reward = reward_signal
         self.context_signals = context_signal
         
-        self.upper_dist = torch.distributions.bernoulli.Bernoulli(0.9*torch.ones(24))
-        self.lower_dist = torch.distributions.bernoulli.Bernoulli(0.1*torch.ones(23))
+        self.upper_dist = torch.distributions.bernoulli.Bernoulli(0.9*torch.ones(25))
+        self.lower_dist = torch.distributions.bernoulli.Bernoulli(0.1*torch.ones(25))
             
     def environment_update(self):
         self.actions += 1
@@ -61,25 +52,26 @@ class Environment():
             odor_tensor = torch.cat((self.upper_dist.sample(),self.lower_dist.sample()), 0)
         elif odor == 1:
             odor_tensor = torch.cat((self.lower_dist.sample(),self.upper_dist.sample()), 0)
-        odor_tensor = torch.cat((odor_tensor, self.context_signals[self.context]), 0)
         
         reward = self.context_odor_action_reward[self.context, odor]
         
         self.environment_update()
         
-        return odor_tensor, reward
+        return odor_tensor, reward, self.context_signals[self.context]
     
     def GameOfLife(self):
-        X = torch.zeros(self.total_actions, 50)
-        y = torch.zeros(self.total_actions, 2)
+        X = torch.zeros(self.total_actions, 25, 50)
+        c = torch.zeros(self.total_actions, 3)
+        y = torch.zeros(self.total_actions, 1, dtype=torch.long)
         
         for i in range(self.total_actions):
-            odor_tensor, reward = self.decision()
+            odor_tensor, reward, contexts = self.decision()
             
-            X[i,:] = odor_tensor
+            X[i,10:15,:] = odor_tensor*torch.ones(5,50)
+            c[i,:] = contexts
             y[i,:] = reward
         
-        return X, y
+        return X, c, y
         
     
 class Dataset(torch.utils.data.Dataset):
@@ -93,12 +85,11 @@ class Dataset(torch.utils.data.Dataset):
     
     def __getitem__(self, index):
         enviro = Environment(self.actions, self.threshold)
-        X, y = enviro.GameOfLife()
-        return X, y
-    
-    
-    
-    
+        X, c, y = enviro.GameOfLife()
+        return X, c, y
+
+
+
 
 
 
