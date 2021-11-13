@@ -23,6 +23,8 @@ context_signal = torch.tensor([[1,0,0],
                                [0,1,0],
                                [0,0,1]])
 
+pnCells = 20
+
 class Environment():
     def __init__(self, total_actions, action_threshold):
         self.threshold = action_threshold
@@ -35,8 +37,8 @@ class Environment():
         self.context_odor_action_reward = reward_signal
         self.context_signals = context_signal
         
-        self.upper_dist = torch.distributions.bernoulli.Bernoulli(0.9*torch.ones(25))
-        self.lower_dist = torch.distributions.bernoulli.Bernoulli(0.1*torch.ones(25))
+        self.upper_dist = torch.distributions.bernoulli.Bernoulli(0.9*torch.ones(int(pnCells/2)))
+        self.lower_dist = torch.distributions.bernoulli.Bernoulli(0.1*torch.ones(int(pnCells/2)))
             
     def environment_update(self):
         self.actions += 1
@@ -60,14 +62,14 @@ class Environment():
         return odor_tensor, reward, self.context_signals[self.context]
     
     def GameOfLife(self):
-        X = torch.zeros(self.total_actions, 25, 50)
+        X = torch.zeros(self.total_actions, 25, pnCells)
         c = torch.zeros(self.total_actions, 3)
         y = torch.zeros(self.total_actions, 1, dtype=torch.long)
         
         for i in range(self.total_actions):
             odor_tensor, reward, contexts = self.decision()
             
-            X[i,10:15,:] = odor_tensor*torch.ones(5,50)
+            X[i,10:15,:] = odor_tensor*torch.ones(5,pnCells)
             c[i,:] = contexts
             y[i,:] = reward
         

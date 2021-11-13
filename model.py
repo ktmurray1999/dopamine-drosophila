@@ -7,10 +7,14 @@ Created on Tue Oct 26 00:23:39 2021
 import torch
 import torch.nn as nn
 
+pnCells = 20
+knCells = 800
+outCells = 14
+
 class ProjectionNeuron(nn.Module):
     def __init__(self, tau, dt):
         super(ProjectionNeuron, self).__init__()
-        self.bias = nn.Parameter(torch.distributions.normal.Normal(torch.zeros(50), 
+        self.bias = nn.Parameter(torch.distributions.normal.Normal(torch.zeros(pnCells), 
                                                                    torch.tensor([0.5])).sample())
         self.tau = torch.tensor(tau)
         self.dt = torch.tensor(dt)
@@ -24,16 +28,17 @@ class ProjectionNeuron(nn.Module):
         return state_plus_1
     
 class KenyonCell(nn.Module):
-    def __init__(self, tau, RC, dt):
+    def __init__(self, tau, RC, batch, dt):
         super(KenyonCell, self).__init__()
-        self.pn_weight = torch.distributions.normal.Normal(torch.zeros(100000), 
+        self.pn_weight = torch.distributions.normal.Normal(torch.zeros(batch*pnCells*knCells), 
                                                            torch.tensor([0.5])).sample()
-        self.pn_weight = torch.reshape(self.pn_weight, (50, 2000))
-        self.apl_weight = torch.ones(1, 2000)
-        self.bias = nn.Parameter(torch.distributions.normal.Normal(torch.zeros(2000), 
+        self.pn_weight = torch.reshape(self.pn_weight, (batch, pnCells, knCells))
+        self.apl_weight = torch.ones(1, knCells)
+        self.bias = nn.Parameter(torch.distributions.normal.Normal(torch.zeros(knCells), 
                                                                    torch.tensor([0.5])).sample())
         self.RC = torch.tensor(RC)
         self.tau = torch.tensor(tau)
+        self.batch = batch
         self.dt = torch.tensor(dt)
         
         self.activation = nn.ReLU()
@@ -41,7 +46,8 @@ class KenyonCell(nn.Module):
     def forward(self, state, pn_inputs, apl_inputs):
         dt_tau = self.dt/self.tau
         apl_value = torch.matmul(apl_inputs, self.apl_weight)
-        pn_value = torch.matmul(pn_inputs, self.pn_weight)
+        pn_value = torch.matmul(torch.unsqueeze(pn_inputs, 1), self.pn_weight)
+        pn_value = torch.squeeze(pn_value)
         state_plus_1 = state*(1-dt_tau) + dt_tau*self.activation(pn_value - apl_value + self.bias)
         
         return state_plus_1
@@ -51,11 +57,16 @@ class KenyonCell(nn.Module):
         LowPassState_plus_1 = alpha*state + (1-alpha)*LowPassState
         
         return LowPassState_plus_1
+    
+    def resetWeights(self):
+        self.pn_weight = torch.distributions.normal.Normal(torch.zeros(self.batch*pnCells*knCells), 
+                                                           torch.tensor([0.5])).sample()
+        self.pn_weight = torch.reshape(self.pn_weight, (self.batch, pnCells, knCells))
 
 class APLCell(nn.Module):
     def __init__(self, tau, dt):
         super(APLCell, self).__init__()
-        self.kc_weight = torch.ones(2000, 1)
+        self.kc_weight = torch.ones(knCells, 1)
         self.bias = nn.Parameter(torch.distributions.normal.Normal(torch.zeros(1), 
                                                                    torch.tensor([0.5])).sample())
         self.tau = torch.tensor(tau)
@@ -73,7 +84,7 @@ class APLCell(nn.Module):
 class MBONCell(nn.Module):
     def __init__(self, tau, tau_weights, dt):
         super(MBONCell, self).__init__()
-        self.bias = nn.Parameter(torch.distributions.normal.Normal(torch.zeros(34), 
+        self.bias = nn.Parameter(torch.distributions.normal.Normal(torch.zeros(outCells), 
                                                                    torch.tensor([0.5])).sample())
         self.tau_weights = torch.tensor(tau_weights)
         self.tau = torch.tensor(tau)
@@ -102,13 +113,13 @@ class MBONCell(nn.Module):
 class DANCell(nn.Module):
     def __init__(self, tau, RC, dt):
         super(DANCell, self).__init__()
-        self.mbon_weight = torch.distributions.normal.Normal(torch.zeros(1156), 
+        self.mbon_weight = torch.distributions.normal.Normal(torch.zeros(outCells*outCells), 
                                                              torch.tensor([0.5])).sample()
-        self.mbon_weight = nn.Parameter(torch.reshape(self.mbon_weight, (34, 34)))
-        self.context_weight = torch.distributions.normal.Normal(torch.zeros(102),
+        self.mbon_weight = nn.Parameter(torch.reshape(self.mbon_weight, (outCells, outCells)))
+        self.context_weight = torch.distributions.normal.Normal(torch.zeros(3*outCells),
                                                                 torch.tensor([0.5])).sample()
-        self.context_weight = nn.Parameter(torch.reshape(self.context_weight, (3, 34)))
-        self.bias = nn.Parameter(torch.distributions.normal.Normal(torch.zeros(34), 
+        self.context_weight = nn.Parameter(torch.reshape(self.context_weight, (3, outCells)))
+        self.bias = nn.Parameter(torch.distributions.normal.Normal(torch.zeros(outCells), 
                                                                    torch.tensor([0.5])).sample())
         self.RC = torch.tensor(RC)
         self.tau = torch.tensor(tau)
@@ -134,30 +145,30 @@ class ComplexFly(nn.Module):
     def __init__(self, batch, dt, device):
         super(ComplexFly, self).__init__()
         self.projection = ProjectionNeuron(1,dt).to(device)
-        self.kenyon = KenyonCell(1,5,dt).to(device)
+        self.kenyon = KenyonCell(1,5,batch,dt).to(device)
         self.apl = APLCell(2.5,dt).to(device)
         self.mbon = MBONCell(1,5,dt).to(device)
         self.dan = DANCell(1,5,dt).to(device)
-        self.decoder = nn.Linear(34, 2).to(device)
+        self.decoder = nn.Linear(outCells, 2).to(device)
         
-        self.kc_weight = torch.distributions.normal.Normal(torch.zeros(batch*2000*34), 
+        self.kc_weight = torch.distributions.normal.Normal(torch.zeros(batch*knCells*outCells), 
                                                            torch.tensor([0.5])).sample()
-        self.kc_weight = torch.reshape(self.kc_weight, (batch, 2000, 34))
+        self.kc_weight = torch.reshape(self.kc_weight, (batch, knCells, outCells))
                 
         self.batch = batch
         self.dt = dt
         self.device = device
 
     def forward(self, odor, context):
-        state_pn = torch.zeros(self.batch, 50).to(self.device)
-        state_kc = torch.zeros(self.batch, 2000).to(self.device)
+        state_pn = torch.zeros(self.batch, pnCells).to(self.device)
+        state_kc = torch.zeros(self.batch, knCells).to(self.device)
         state_apl = torch.zeros(self.batch, 1).to(self.device)
-        state_mbon = torch.zeros(self.batch, 34).to(self.device)
-        state_dan = torch.zeros(self.batch, 34).to(self.device)
+        state_mbon = torch.zeros(self.batch, outCells).to(self.device)
+        state_dan = torch.zeros(self.batch, outCells).to(self.device)
         
-        state_low_kc = torch.zeros(self.batch, 2000).to(self.device)
-        state_low_dan = torch.zeros(self.batch, 34).to(self.device)
-        state_weight_activation = torch.zeros(self.batch, 2000, 34)
+        state_low_kc = torch.zeros(self.batch, knCells).to(self.device)
+        state_low_dan = torch.zeros(self.batch, outCells).to(self.device)
+        state_weight_activation = torch.zeros(self.batch, knCells, outCells)
         
         for t in range(odor.size(1)):
             state_pn = self.projection(state_pn, odor[:,t])
@@ -179,9 +190,10 @@ class ComplexFly(nn.Module):
         return output
     
     def resetWeights(self,):
-        self.kc_weight = torch.distributions.normal.Normal(torch.zeros(self.batch*2000*34), 
+        self.kc_weight = torch.distributions.normal.Normal(torch.zeros(self.batch*knCells*outCells), 
                                                            torch.tensor([0.5])).sample()
-        self.kc_weight = torch.reshape(self.kc_weight, (self.batch, 2000, 34))
+        self.kc_weight = torch.reshape(self.kc_weight, (self.batch, knCells, outCells))
+        self.kenyon.resetWeights()
 
 
 

@@ -13,7 +13,7 @@ device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
 def OptimizeModel(net, batch, actions, threshold, epochs):    
     # Datasets
-    trainfunc = Dataset(actions, threshold, batch*5)
+    trainfunc = Dataset(actions, threshold, batch*10)
     trainloader = torch.utils.data.DataLoader(trainfunc, batch_size=batch, shuffle=True, num_workers=0)
     
     # Optimize and Loss
@@ -39,17 +39,18 @@ def OptimizeModel(net, batch, actions, threshold, epochs):
             loss.backward(retain_graph=True)
             optimizer.step()
             loss_results.append(loss.item())
+            print(loss.item())
             
     print('Finished Training')
     return loss_results
 
 
 if __name__ == "__main__":
-    batch = 5
+    batch = 30
     dt = 0.5
-    amount_of_actions = 50
+    amount_of_actions = 100
     action_threshold = 5
-    epochs = 20
+    epochs = 500
     net = ComplexFly(batch, dt, device)
     results = OptimizeModel(net, batch, amount_of_actions, action_threshold, epochs)
     fig, ax = plt.subplots()
