@@ -153,7 +153,7 @@ class ComplexFly(nn.Module):
         
         self.kc_weight = torch.distributions.normal.Normal(torch.zeros(batch*knCells*outCells), 
                                                            torch.tensor([0.5])).sample()
-        self.kc_weight = torch.reshape(self.kc_weight, (batch, knCells, outCells))
+        self.kc_weight = torch.reshape(self.kc_weight, (batch, knCells, outCells)).to(device)
                 
         self.batch = batch
         self.dt = dt
@@ -168,7 +168,7 @@ class ComplexFly(nn.Module):
         
         state_low_kc = torch.zeros(self.batch, knCells).to(self.device)
         state_low_dan = torch.zeros(self.batch, outCells).to(self.device)
-        state_weight_activation = torch.zeros(self.batch, knCells, outCells)
+        state_weight_activation = torch.zeros(self.batch, knCells, outCells).to(self.device)
         
         for t in range(odor.size(1)):
             state_pn = self.projection(state_pn, odor[:,t])
@@ -192,7 +192,7 @@ class ComplexFly(nn.Module):
     def resetWeights(self,):
         self.kc_weight = torch.distributions.normal.Normal(torch.zeros(self.batch*knCells*outCells), 
                                                            torch.tensor([0.5])).sample()
-        self.kc_weight = torch.reshape(self.kc_weight, (self.batch, knCells, outCells))
+        self.kc_weight = torch.reshape(self.kc_weight, (self.batch, knCells, outCells)).to(self.device)
         self.kenyon.resetWeights()
 
 

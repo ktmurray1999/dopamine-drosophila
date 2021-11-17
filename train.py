@@ -10,6 +10,7 @@ from environment import Dataset
 from model import ComplexFly
 import matplotlib.pyplot as plt
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+device = torch.device('cpu' if torch.cuda.is_available() else 'cpu')
 
 def OptimizeModel(net, batch, actions, threshold, epochs):    
     # Datasets
@@ -39,7 +40,7 @@ def OptimizeModel(net, batch, actions, threshold, epochs):
             loss.backward(retain_graph=True)
             optimizer.step()
             loss_results.append(loss.item())
-            print(loss.item())
+        print(loss.item())
             
     print('Finished Training')
     return loss_results
@@ -51,7 +52,7 @@ if __name__ == "__main__":
     amount_of_actions = 100
     action_threshold = 5
     epochs = 500
-    net = ComplexFly(batch, dt, device)
+    net = ComplexFly(batch, dt, device).to(device)
     results = OptimizeModel(net, batch, amount_of_actions, action_threshold, epochs)
     fig, ax = plt.subplots()
     ax.plot(results)
