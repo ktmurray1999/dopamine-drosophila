@@ -77,13 +77,13 @@ class Environment():
         
     
 class Dataset(torch.utils.data.Dataset):
-    def __init__(self, actions, threshold, runs):
+    def __init__(self, actions, threshold, batch):
         self.actions = actions
         self.threshold = threshold
-        self.runs = runs
+        self.batch = batch
         
     def __len__(self):
-        return self.runs
+        return self.batch
     
     def __getitem__(self, index):
         enviro = Environment(self.actions, self.threshold)

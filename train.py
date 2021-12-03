@@ -12,6 +12,19 @@ import matplotlib.pyplot as plt
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 device = torch.device('cpu' if torch.cuda.is_available() else 'cpu')
 
+def TestModel(net, batch, actions, threshold):
+    trainfunc = Dataset(actions, threshold, batch)
+    trainloader = torch.utils.data.DataLoader(trainfunc, batch_size=batch, shuffle=True, num_workers=0)
+    
+    for k, data in enumerate(trainloader, 0):
+        inputs, contexts, labels = data[0].to(device), data[1].to(device), data[2].to(device)
+        net.resetWeights()
+        for i in range(actions):
+            X = inputs[:,i,:,:]
+            c = contexts[:,i,:]
+            y = torch.squeeze(labels[:,i,:])
+            action = net(X, c)
+            
 def OptimizeModel(net, batch, actions, threshold, epochs):    
     # Datasets
     trainfunc = Dataset(actions, threshold, batch*10)
