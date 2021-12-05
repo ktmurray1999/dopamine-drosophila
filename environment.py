@@ -17,7 +17,9 @@ context_change_p = [1/3, 1/3, 1/3]
 hungry_reward = [0,1]
 thirsty_reward = [1,0]
 tired_reward = [1,1]
-reward_signal = torch.tensor([hungry_reward,thirsty_reward,tired_reward])
+reward_signal = torch.tensor([hungry_reward,
+                              thirsty_reward,
+                              tired_reward])
 
 context_signal = torch.tensor([[1,0,0],
                                [0,1,0],
@@ -36,10 +38,14 @@ class Environment():
         
         self.context_odor_action_reward = reward_signal
         self.context_signals = context_signal
+        self.create_odors()
         
-        self.upper_dist = torch.distributions.bernoulli.Bernoulli(0.9*torch.ones(int(pnCells/2)))
-        self.lower_dist = torch.distributions.bernoulli.Bernoulli(0.1*torch.ones(int(pnCells/2)))
-            
+    def create_odors(self,):
+        self.dist = torch.distributions.bernoulli.Bernoulli(0.5*torch.ones(pnCells))
+        
+        self.odor_food = [self.dist.sample() for i in range(4)]
+        self.odor_drink = [self.dist.sample() for i in range(4)]
+        
     def environment_update(self):
         self.actions += 1
         if self.actions > self.threshold:
@@ -48,12 +54,13 @@ class Environment():
             self.context_switches += 1
         
     def decision(self):
-        odor = np.random.choice(2, 1, p=[0.5, 0.5])[0]
+        odor = np.random.randint(0, 2, 1)[0]
+        odor_index =  np.random.randint(0, 4, 1)[0]
         
         if odor == 0:
-            odor_tensor = torch.cat((self.upper_dist.sample(),self.lower_dist.sample()), 0)
+            odor_tensor = self.odor_food[odor_index]
         elif odor == 1:
-            odor_tensor = torch.cat((self.lower_dist.sample(),self.upper_dist.sample()), 0)
+            odor_tensor = self.odor_drink[odor_index]
         
         reward = self.context_odor_action_reward[self.context, odor]
         
@@ -73,21 +80,6 @@ class Environment():
             c[i,:] = contexts
             y[i,:] = reward
         
-        return X, c, y
-        
-    
-class Dataset(torch.utils.data.Dataset):
-    def __init__(self, actions, threshold, batch):
-        self.actions = actions
-        self.threshold = threshold
-        self.batch = batch
-        
-    def __len__(self):
-        return self.batch
-    
-    def __getitem__(self, index):
-        enviro = Environment(self.actions, self.threshold)
-        X, c, y = enviro.GameOfLife()
         return X, c, y
 
 
