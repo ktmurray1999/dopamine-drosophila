@@ -33,7 +33,7 @@ def FindNan(net):
     state_dict = net.state_dict()
     for i in state_dict:
         if torch.sum(torch.isnan(state_dict[i])).item() > 0:
-            string_to_exec = 'net.'+i+'.data = torch.nan_to_num(state_dict[i])'
+            string_to_exec = 'net.'+i+'.data = torch.nan_to_num(state_dict[i], nan=-0.5)'
             exec(string_to_exec)
             print(i)
             print(torch.sum(torch.isnan(state_dict[i])).item())
@@ -83,7 +83,7 @@ if __name__ == "__main__":
     dt = 0.5
     amount_of_actions = 100
     action_threshold = 20
-    epochs = 1000
+    epochs = 1500
     net = ComplexFly(batch, dt, device).to(device)
     enviro = Environment(amount_of_actions, action_threshold)
     results = OptimizeModel(net, batch, enviro, amount_of_actions, epochs)

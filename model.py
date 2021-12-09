@@ -68,8 +68,7 @@ class APLCell(nn.Module):
     def __init__(self, tau, dt):
         super(APLCell, self).__init__()
         self.kc_weight = torch.ones(knCells, 1)
-        self.bias = nn.Parameter(torch.distributions.normal.Normal(torch.zeros(1), 
-                                                                   torch.tensor([0.5])).sample())
+        self.bias = torch.tensor([-0.5])
         self.tau = torch.tensor(tau)
         self.dt = torch.tensor(dt)
         
