@@ -9,8 +9,7 @@ import torch.nn as nn
 from environment import Dataset
 from model import ComplexFly, ComplexFlyLesion
 import matplotlib.pyplot as plt
-device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-device = torch.device('cpu' if torch.cuda.is_available() else 'cpu')
+device = torch.device('cpu')
 
 def TestModel(net, batch, actions, threshold):
     net.eval()

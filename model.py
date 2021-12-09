@@ -7,11 +7,10 @@ Created on Tue Oct 26 00:23:39 2021
 import torch
 import torch.nn as nn
 
-pnCells = 20
-# knCells = 800
+pnCells = 10
 knCells = 100
-mbonCells = 14
-danCells = 14
+mbonCells = 10
+danCells = 10
 
 class ProjectionNeuron(nn.Module):
     def __init__(self, tau, dt):
@@ -83,21 +82,12 @@ class APLCell(nn.Module):
         
         return state_plus_1
 
-class DANActivation(nn.Module):
-    def __init__(self,):
-        super(DANActivation, self).__init__()
-        self.relu = nn.ReLU()
-
-    def forward(self, dan_inputs):
-        dan_outputs = torch.minimum(2*self.relu(dan_inputs), torch.ones(dan_inputs.shape))
-        return dan_outputs
-
 class MBONCell(nn.Module):
     def __init__(self, tau, tau_weights, batch, dt):
         super(MBONCell, self).__init__()
-        self.dan_weight = torch.distributions.normal.Normal(torch.zeros(batch*danCells*mbonCells), 
+        self.dan_weight = torch.distributions.normal.Normal(torch.zeros(danCells*mbonCells), 
                                                            torch.tensor([0.5])).sample()
-        self.dan_weight = nn.Parameter(torch.reshape(self.dan_weight, (batch, danCells, mbonCells)))
+        self.dan_weight = nn.Parameter(torch.reshape(self.dan_weight, (danCells, mbonCells)))
         
         self.bias = nn.Parameter(torch.distributions.normal.Normal(torch.zeros(mbonCells), 
                                                                    torch.tensor([0.5])).sample())
@@ -106,14 +96,14 @@ class MBONCell(nn.Module):
         self.batch = batch
         self.dt = torch.tensor(dt)
         
-        self.dan_activation = DANActivation()
+        self.dan_activation = nn.Sigmoid()
         self.activation = nn.ReLU()
 
     def forward(self, state, kc_weights, kc_inputs, dan_inputs):
         dt_tau = self.dt/self.tau
         kc_value = torch.matmul(torch.unsqueeze(kc_inputs, 1), kc_weights)
         kc_value = torch.squeeze(kc_value)
-        dan_value = torch.matmul(torch.unsqueeze(dan_inputs, 1), self.dan_weight)
+        dan_value = torch.matmul(dan_inputs, self.dan_weight)
         dan_mod = self.dan_activation(torch.squeeze(dan_value))
         state_plus_1 = state*(1-dt_tau) + dt_tau*dan_mod*self.activation(kc_value + self.bias)
         
@@ -163,8 +153,8 @@ class ComplexFly(nn.Module):
         super(ComplexFly, self).__init__()
         self.projection = ProjectionNeuron(1,dt).to(device)
         self.kenyon = KenyonCell(1,5,batch,dt).to(device)
-        self.apl = APLCell(2.5,dt).to(device)
-        self.mbon = MBONCell(1,5,batch,dt).to(device)
+        self.apl = APLCell(1,dt).to(device)
+        self.mbon = MBONCell(1,2,batch,dt).to(device)
         self.dan = DANCell(1,5,dt).to(device)
         self.decoder = nn.Linear(mbonCells, 2).to(device)
         

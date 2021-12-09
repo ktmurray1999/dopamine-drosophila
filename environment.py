@@ -25,7 +25,7 @@ context_signal = torch.tensor([[1,0,0],
                                [0,1,0],
                                [0,0,1]])
 
-pnCells = 20
+pnCells = 10
 
 class Environment():
     def __init__(self, total_actions, action_threshold):
@@ -43,8 +43,8 @@ class Environment():
     def create_odors(self,):
         self.dist = torch.distributions.bernoulli.Bernoulli(0.5*torch.ones(pnCells))
         
-        self.odor_food = [self.dist.sample() for i in range(4)]
-        self.odor_drink = [self.dist.sample() for i in range(4)]
+        self.odor_food = [self.dist.sample() for i in range(2)]
+        self.odor_drink = [self.dist.sample() for i in range(2)]
         
     def environment_update(self):
         self.actions += 1
@@ -55,7 +55,7 @@ class Environment():
         
     def decision(self):
         odor = np.random.randint(0, 2, 1)[0]
-        odor_index =  np.random.randint(0, 4, 1)[0]
+        odor_index =  np.random.randint(0, 2, 1)[0]
         
         if odor == 0:
             odor_tensor = self.odor_food[odor_index]
