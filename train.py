@@ -79,17 +79,17 @@ def OptimizeModel(net, batch, environment, actions, epochs):
 
 
 if __name__ == "__main__":
-    batch = 10
+    batch = 15
     dt = 0.5
-    amount_of_actions = 100
+    amount_of_actions = 300
     action_threshold = 20
-    epochs = 2500
+    epochs = 10`00
     net = ComplexFly(batch, dt, device).to(device)
-    net.load_state_dict(torch.load('model_complex.pt'))
+    net.load_state_dict(torch.load('model_complex1.pt'))
     enviro = Environment(amount_of_actions, action_threshold)
-    enviro_foods = torch.load('environment_vectors.pt')
-    enviro.odor_food = enviro_foods['odor_food']
-    enviro.odor_drink = enviro_foods['odor_drink']
+    # enviro_foods = torch.load('environment_vectors.pt')
+    # enviro.odor_food = enviro_foods['odor_food']
+    # enviro.odor_drink = enviro_foods['odor_drink']
     results = OptimizeModel(net, batch, enviro, amount_of_actions, epochs)
     fig, ax = plt.subplots()
     ax.plot(results)
@@ -99,7 +99,7 @@ if __name__ == "__main__":
     plt.savefig('results.png')
     plt.show()
     torch.save({'results':results}, 'results_12_9_p2.pt')
-    torch.save(net.state_dict(), 'model_complex1.pt')
+    torch.save(net.state_dict(), 'model_mid_day.pt')
     
     # enviro_vecs = {'odor_food': enviro.odor_food, 'odor_drink': enviro.odor_drink}
     # torch.save(enviro_vecs, 'environment_vectors.pt')
