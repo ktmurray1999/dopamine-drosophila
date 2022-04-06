@@ -4,30 +4,24 @@ Created on Tue Feb 22 06:49:58 2022
 
 @author: murra
 """
-import numpy as np
 import torch
 from torch.distributions import Categorical
 
 pnCells = 3
 
 class Environment():
-    def __init__(self,):
+    def __init__(self, theta):
         self.groceries = torch.tensor([[1,0,0],
                                        [1,0,1],
                                        [1,1,1],
                                        [0,1,0],
                                        [0,0,1],
                                        [0,1,1]])
-
-        self.target = torch.tensor([[1,-1],
-                                    [-1,1],
-                                    [1,-1],
-                                    [-1,1],
-                                    [1,-1],
-                                    [-1,1]]) 
+        
+        self.classification = torch.tensor([[0],[1],[0],[1],[0],[1],])
         
         self.tables = []
-        self.theta = 0.8
+        self.theta = theta
         
     def calc_occupied_probs(self, n):
         probs = []
@@ -43,10 +37,15 @@ class Environment():
             self.tables.append(1)
             return 0
         else:
-            probs = self.calc_occupied_probs(n)
-            probs.append(self.theta/(n + self.theta))
-            dist = Categorical(torch.tensor(probs))
-            
+            if len(self.tables) == len(self.classification):
+                probs = [i/sum(self.tables) for i in self.tables]
+                dist = Categorical(torch.tensor(probs))
+                
+            else:
+                probs = self.calc_occupied_probs(n)
+                probs.append(self.theta/(n + self.theta))
+                dist = Categorical(torch.tensor(probs))
+                
             table = dist.sample()
             if table.item() == len(self.tables):
                 self.tables.append(1)
@@ -58,7 +57,7 @@ class Environment():
     def get_action(self, trial):
         index = self.new_customer(trial)
         stimuli = self.groceries[index]
-        target = self.target[index]
+        target = self.classification[index]
         
         return stimuli, target
         

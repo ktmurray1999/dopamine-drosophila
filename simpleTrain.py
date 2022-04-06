@@ -5,30 +5,43 @@ Created on Tue Feb 22 11:33:40 2022
 @author: murra
 """
 import torch
+import torch.nn as nn
 from simpleEnv import Environment
-from model import simpleFly
+from simpleModel import simpleFly
 import matplotlib.pyplot as plt
 from tqdm import tqdm
-device = torch.device('cpu')
+import argparse
+import os
+
+parser = argparse.ArgumentParser(description='training parameters')
+parser.add_argument('--iter', type=int, default=4)
+parser.add_argument('--epochs', type=int, default=1000)
+parser.add_argument('--actions', type=int, default=31)
+parser.add_argument('--theta', type=float, default=0.6)
+parser.add_argument('--rate', type=int, default=4)
+
+args = parser.parse_args()
 
 # torch.autograd.set_detect_anomaly(True)
 
-def OptimizeModel(net, batch, environment, epochs, actions, time):    
+def OptimizeModel(net, batch, environment, epochs, actions,):    
     # Optimize and Loss
     net.train()
-    optimizer = torch.optim.Adam(net.parameters())
+    optimizer = torch.optim.Adam(net.parameters(), lr=10**(-1*args.rate))
+    lossfunc = nn.CrossEntropyLoss()
     loss_results = []
     
     print('Epoch Progress bar')
     for epoch in tqdm(range(epochs)):
         net.resetWeights()
-        life = torch.tensor([[5.0,]]) # Saturate health bar
+        life = torch.tensor([[5.0,]])
+        loss = torch.tensor(0.0)
         environment.clear_tables()
         optimizer.zero_grad()
         
-        for i in range(actions):
+        for i in range(1,actions):
             stimuli, target = environment.get_action(i, )
-            for t in range(time):
+            for t in range(15):
                 if t < 5:
                     X = torch.tensor([[0,0,0]])
                 elif t < 10:
@@ -36,13 +49,18 @@ def OptimizeModel(net, batch, environment, epochs, actions, time):
                 else:
                     X = torch.tensor([[0,0,0]])
                     
-                action = net(X, torch.tensor([[life.item(),]]))
-            life += torch.sum(torch.squeeze(action)*target) # Use cross entropy loss function
+                action = net(X, life)
+            loss += lossfunc(action, target)
             
-            if life < 0.0: # This is only a stopping condition, not a learning condition
+            if torch.argmax(action) == target:
+                if life.item() != 10.0:
+                    life = life + 1.0
+            else:
+                life = life - 1.0
+            
+            if life <= 0.0:
                 break
         
-        loss = -1*life
         loss.backward()
         torch.nn.utils.clip_grad_norm_(net.parameters(), 1.0)
         optimizer.step()
@@ -53,24 +71,27 @@ def OptimizeModel(net, batch, environment, epochs, actions, time):
 
 
 if __name__ == "__main__":
-    batch = 1
     dt = 0.5
-    epochs = 50
-    actions = 10 # Increase actions
-    time = 15
+    epochs = args.epochs
+    actions = args.actions
     
-    net = simpleFly(batch, dt, device)
-    enviro = Environment()
-    results = OptimizeModel(net, batch, enviro, epochs, actions, time)
+    net = simpleFly(1, dt,)
+    enviro = Environment(args.theta)
+    results = OptimizeModel(net, 1, enviro, epochs, actions)
+    
+    os.mkdir('results'+os.sep+str(args.iter))
     
     fig, ax = plt.subplots()
     ax.plot(results)
-    ax.set_ylabel('Training Health bar')
-    ax.set_xlabel('Training epoch')
-    ax.set_title('Health bar of model during training epochs')
-    plt.savefig('results.png')
+    ax.set_xlabel('Training Epochs')
+    ax.set_ylabel('Health bar')
+    ax.set_title('Final health bar during training epochs')
+    plt.savefig('results'+os.sep+str(args.iter)+'/fig_'+str(args.iter)+'.png')
     plt.show()
-    torch.save(net.state_dict(), 'model_simple.pt')
+    
+    torch.save(net.state_dict(), 'results'+os.sep+str(args.iter)+'/model.pt')
+    torch.save(results, 'results'+os.sep+str(args.iter)+'/results.pt')
+    torch.save(args, 'results'+os.sep+str(args.iter)+'/args.pt')
     
     # Testing matrix
     #    Freeze weights and test on all seen stimuli
